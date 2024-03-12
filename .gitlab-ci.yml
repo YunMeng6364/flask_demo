@@ -1,0 +1,34 @@
+stages:
+  - test
+  - deploy
+
+test-job:
+  tags:
+    - flask
+  stage: test
+  script:
+    - echo "运行测试"
+    - docker build --no-cache -t my-flask-app .
+    - docker run --rm my-flask-app python3 -m unittest discover -s tests # 使用 docker run --rm 来运行一个临时容器来执行测试。
+  only:
+    - main
+
+build-and-deploy-job:
+  tags:
+    - flask
+  stage: deploy
+  variables:
+    DOCKER_DRIVER: overlay2 # overlay2 是 Docker 的一种存储驱动，它提供了更好的性能和更高效的空间使用，尤其是在处理大量层（layers）时。overlay2 是 overlay 驱动的改进版本，它在 Docker 17.05 版本中引入，作为默认的存储驱动。
+    GIT_DEPTH: "0" # 克隆完整的仓库历史
+
+  #  before_script:
+#    - docker info
+  script:
+    - echo "构建 Docker 镜像"
+    - docker build --no-cache -t my-flask-app .
+    - echo "清理同名容器"
+    - docker rm -f my-flask-app || true # 如果容器存在，则移除它
+    - echo "运行 Flask 容器"
+    - docker run -d -p 5000:5000 --name my-flask-app my-flask-app
+  only:
+    - main # 只有 master 分支会触发部署
